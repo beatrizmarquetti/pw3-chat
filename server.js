@@ -7,6 +7,7 @@ const http = require("http");
 const fs   = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
+const { text } = require("stream/consumers");
 
 // -----------------------------------------------------------
 // 1. Servidor HTTP — entrega os arquivos estáticos da pasta /public
@@ -84,6 +85,8 @@ function listaUsuarios() {
 }
 
 
+
+
 // -----------------------------------------------------------
 // 4. Eventos WebSocket
 // -----------------------------------------------------------
@@ -113,8 +116,40 @@ wss.on("connection", (socket) => {
         username: username,
         color: cor,
       });
+
+      broadcast({
+        tipo: "sistema",
+        texto: `${username} entrou no chat.`,
+        usuarios: listaUsuarios(),
+      });
     }
-  });
+    if (msg.tipo === "mensagem") {
+      const cliente = clientes.get(socket);
+      if (!cliente) return; 
+
+      const texto = String(msg.texto).trim().slice(0, 500);
+      if (!texto) return;
+
+      broadcast({
+        tipo: "mensagem",
+        username: cliente.username,
+        color: cliente.color,
+        texto: texto,
+        hora: new Date().toLocaleDateString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      });
+      socket.on("close", () => {
+        const cliente = clientes.get(socket);
+        if (!cliente) return;
+
+        cliente.delete(socket);
+        broadcast({
+          tipo: "sistema",
+          texto: `${clienteusername} saiu do chat.`,
+          usuarios: listaUsuarios(),
+        });
+      })
+    }
+    });
 });
 
 
